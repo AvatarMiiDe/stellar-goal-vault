@@ -440,6 +440,19 @@ function scheduleNextPoll(delayMs: number): void {
   pollerTimer = setTimeout(async () => {
     try {
       await indexSorobanEvents();
+      
+      if (consecutiveFailures > 0) {
+        logInfo(
+          'soroban_indexer_recovered',
+          {
+            message: `Indexer recovered after ${consecutiveFailures} failures.`,
+            retryCount: consecutiveFailures,
+            outcome: 'success',
+          },
+          config.logLevel,
+        );
+      }
+      
       consecutiveFailures = 0;
       lastSuccessfulPollTime = Date.now();
       scheduleNextPoll(POLL_INTERVAL_MS);
@@ -449,12 +462,16 @@ function scheduleNextPoll(delayMs: number): void {
         POLL_INTERVAL_MS * Math.pow(2, consecutiveFailures),
         MAX_BACKOFF_MS,
       );
+      
+      const reason = err instanceof Error ? err.message : String(err);
+      
       logError(
-        err,
+        new Error('Indexer poll failed'),
         {
           event: 'soroban_event_index_error',
           consecutiveFailures,
           nextRetryMs: backoffMs,
+          reason,
         },
         config.logLevel,
       );
@@ -463,6 +480,7 @@ function scheduleNextPoll(delayMs: number): void {
         {
           message: `RPC failure #${consecutiveFailures}. Retrying in ${backoffMs / 1000}s.`,
           backoffMs,
+          reason,
         },
         config.logLevel,
       );
@@ -473,6 +491,7 @@ function scheduleNextPoll(delayMs: number): void {
 
 export function startEventIndexer(): void {
   ensureKvStore();
+  consecutiveFailures = 0;
 
   const lastLedger = getLastProcessedLedger();
   logInfo(
