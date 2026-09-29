@@ -50,6 +50,21 @@ and **failing** (`failing`).
 
 ## Structured logs
 
+### Health Checks
+
+Health check endpoints emit a structured `health_check` log representing the operation and outcome:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `event` | string | Always `health_check` |
+| `operation` | string | `health_check` or `health_check_deep` |
+| `outcome` | string | `success` or `failure` |
+| `duration_ms` | number | Duration of the check in ms |
+| `requestId` | string | Correlation ID linking the check to the `http_request` log |
+| `database`, `indexer`, `soroban`, `contract` | string | Component statuses (e.g. `up`, `down`) |
+
+### HTTP Requests
+
 Every request emits one `http_request` line when the response finishes, success or failure:
 
 | Field | Type | Meaning |

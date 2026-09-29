@@ -356,7 +356,8 @@ export function filterCampaignList(
   });
 }
 
-app.get('/api/health', (_req: Request, res: Response) => {
+app.get('/api/health', (req: Request, res: Response) => {
+  const start = process.hrtime.bigint();
   const database = checkDbHealth();
   const indexer = getIndexerStatus();
   
@@ -370,6 +371,16 @@ app.get('/api/health', (_req: Request, res: Response) => {
     heapTotal: memUsage.heapTotal,
     external: memUsage.external,
   };
+
+  const duration_ms = Number(process.hrtime.bigint() - start) / 1_000_000;
+  
+  logInfo('health_check', {
+    operation: 'health_check',
+    outcome: healthy ? 'success' : 'failure',
+    duration_ms,
+    database: database.status,
+    indexer: indexer.isHealthy ? 'up' : 'down',
+  });
 
   res.status(healthy ? 200 : 503).json({
     service: 'stellar-goal-vault-backend',
@@ -394,7 +405,8 @@ app.get('/api/contributors/:address/pledges', async (req: Request, res: Response
   });
 });
 
-app.get('/api/health/deep', applyRateLimit(1000), async (_req: Request, res: Response) => {
+app.get('/api/health/deep', applyRateLimit(1000), async (req: Request, res: Response) => {
+  const start = process.hrtime.bigint();
   try {
     const database = checkDbHealth();
     const hasContractId = !!config.contractId;
@@ -429,6 +441,18 @@ app.get('/api/health/deep', applyRateLimit(1000), async (_req: Request, res: Res
       external: memUsage.external,
     };
 
+    const duration_ms = Number(process.hrtime.bigint() - start) / 1_000_000;
+    
+    logInfo('health_check', {
+      operation: 'health_check_deep',
+      outcome: allHealthy ? 'success' : 'failure',
+      duration_ms,
+      database: database.status,
+      soroban: sorobanHealthy ? 'up' : 'down',
+      contract: hasContractId ? 'up' : 'down',
+      indexer: indexer.isHealthy ? 'up' : 'down',
+    });
+
     res.status(allHealthy ? 200 : 503).json({
       overall: allHealthy ? 'up' : 'down',
       timestamp: new Date().toISOString(),
@@ -456,6 +480,14 @@ app.get('/api/health/deep', applyRateLimit(1000), async (_req: Request, res: Res
       },
     });
   } catch (error) {
+    const duration_ms = Number(process.hrtime.bigint() - start) / 1_000_000;
+    logError(error, {
+      event: 'health_check',
+      operation: 'health_check_deep',
+      outcome: 'failure',
+      duration_ms,
+    });
+    
     res.status(503).json({
       overall: 'down',
       timestamp: new Date().toISOString(),
