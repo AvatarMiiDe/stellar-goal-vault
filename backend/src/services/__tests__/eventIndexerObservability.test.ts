@@ -118,6 +118,23 @@ describe('eventIndexer observability', () => {
     expect(status.consecutiveFailures).toBeGreaterThanOrEqual(1);
     expect(status.isHealthy).toBe(false);
 
+    // Simulate recovery
+    vi.spyOn(axios.default, 'post').mockResolvedValueOnce({
+      data: { result: { latestLedger: 100, events: [] } },
+    });
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(logInfoMock).toHaveBeenCalledWith(
+      'soroban_indexer_recovery',
+      expect.objectContaining({
+        message: expect.stringContaining('Indexer recovered'),
+        retryCount: expect.any(Number),
+        outcome: 'success',
+        lastErrorReason: expect.any(String),
+      }),
+      expect.any(String),
+    );
+
     stopEventIndexer();
   });
 
